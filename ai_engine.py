@@ -39,7 +39,7 @@ def analyze_trade(
     )
 
     # =========================
-    # CLOSE PRICES
+    # FIX DATAFRAMES
     # =========================
 
     close_prices = (
@@ -48,6 +48,18 @@ def analyze_trade(
 
     higher_close = (
         higher_df["Close"].squeeze()
+    )
+
+    high_prices = (
+        df["High"].squeeze()
+    )
+
+    low_prices = (
+        df["Low"].squeeze()
+    )
+
+    open_prices = (
+        df["Open"].squeeze()
     )
 
     # =========================
@@ -110,8 +122,8 @@ def analyze_trade(
     # =========================
 
     atr_indicator = AverageTrueRange(
-        high=df["High"].squeeze(),
-        low=df["Low"].squeeze(),
+        high=high_prices,
+        low=low_prices,
         close=close_prices,
         window=14
     )
@@ -175,6 +187,68 @@ def analyze_trade(
     )
 
     # =========================
+    # SUPPORT & RESISTANCE
+    # =========================
+
+    recent_high = float(
+        high_prices.tail(20).max()
+    )
+
+    recent_low = float(
+        low_prices.tail(20).min()
+    )
+
+    # =========================
+    # CANDLESTICK PATTERNS
+    # =========================
+
+    prev_open = float(
+        open_prices.iloc[-2]
+    )
+
+    prev_close = float(
+        close_prices.iloc[-2]
+    )
+
+    current_open = float(
+        open_prices.iloc[-1]
+    )
+
+    current_close = float(
+        close_prices.iloc[-1]
+    )
+
+    # =========================
+    # BULLISH ENGULFING
+    # =========================
+
+    bullish_engulfing = (
+
+        prev_close < prev_open
+
+        and current_close > current_open
+
+        and current_close > prev_open
+
+        and current_open < prev_close
+    )
+
+    # =========================
+    # BEARISH ENGULFING
+    # =========================
+
+    bearish_engulfing = (
+
+        prev_close > prev_open
+
+        and current_close < current_open
+
+        and current_open > prev_close
+
+        and current_close < prev_open
+    )
+
+    # =========================
     # ANALYSIS OBJECT
     # =========================
 
@@ -196,12 +270,25 @@ def analyze_trade(
 
         "market_price": current_price,
 
+        "support": round(
+            recent_low,
+            2
+        ),
+
+        "resistance": round(
+            recent_high,
+            2
+        ),
+
+        "bullish_engulfing": bullish_engulfing,
+
+        "bearish_engulfing": bearish_engulfing,
+
         "stop_loss": 0,
 
         "take_profit": 0,
 
-        "reason": ""
-
+        "reason": "No valid setup"
     }
 
     # =========================
@@ -211,16 +298,28 @@ def analyze_trade(
     if signal == "BUY":
 
         if (
-            latest_rsi > 50
+
+            latest_rsi > 45
+
             and current_price > latest_ema
+
             and latest_macd > latest_macd_signal
+
             and latest_atr > 5
+
             and higher_price > higher_ema
+
+            and current_price > (
+                recent_high - 15
+            )
+
+            and bullish_engulfing
+
         ):
 
             analysis["approved"] = True
 
-            analysis["confidence"] = 0.90
+            analysis["confidence"] = 0.93
 
             analysis["stop_loss"] = round(
                 current_price
@@ -235,10 +334,11 @@ def analyze_trade(
             )
 
             analysis["reason"] = (
-                "Bullish trend + "
+                "Bullish engulfing + "
+                "breakout + "
+                "trend confirmation + "
                 "RSI strength + "
-                "MACD confirmation + "
-                "healthy volatility"
+                "MACD bullish"
             )
 
     # =========================
@@ -248,16 +348,28 @@ def analyze_trade(
     elif signal == "SELL":
 
         if (
-            latest_rsi < 50
+
+            latest_rsi < 55
+
             and current_price < latest_ema
+
             and latest_macd < latest_macd_signal
+
             and latest_atr > 5
+
             and higher_price < higher_ema
+
+            and current_price < (
+                recent_low + 15
+            )
+
+            and bearish_engulfing
+
         ):
 
             analysis["approved"] = True
 
-            analysis["confidence"] = 0.90
+            analysis["confidence"] = 0.93
 
             analysis["stop_loss"] = round(
                 current_price
@@ -272,10 +384,11 @@ def analyze_trade(
             )
 
             analysis["reason"] = (
-                "Bearish trend + "
+                "Bearish engulfing + "
+                "breakdown + "
+                "trend confirmation + "
                 "RSI weakness + "
-                "MACD confirmation + "
-                "healthy volatility"
+                "MACD bearish"
             )
 
     return analysis
