@@ -1,3 +1,7 @@
+from paper_trader import (
+    open_trade
+)
+
 import time
 
 import yfinance as yf
@@ -6,6 +10,10 @@ from ai_engine import analyze_trade
 
 from telegram_alerts import (
     send_telegram_alert
+)
+
+from cooldown import (
+    can_send_signal
 )
 
 # =========================
@@ -49,7 +57,7 @@ while True:
             df = yf.download(
                 symbol,
                 period="1d",
-                interval="1m",
+                interval="5m",
                 progress=False
             )
 
@@ -71,7 +79,7 @@ while True:
 
             buy_analysis = analyze_trade(
                 "BUY",
-                symbol,
+                market_name,
                 current_price
             )
 
@@ -81,7 +89,7 @@ while True:
 
             sell_analysis = analyze_trade(
                 "SELL",
-                symbol,
+                market_name,
                 current_price
             )
 
@@ -112,9 +120,57 @@ Reason:
 {buy_analysis['reason']}
 """
 
-                send_telegram_alert(
-                    message
-                )
+                # =========================
+                # COOLDOWN FILTER
+                # =========================
+
+                if can_send_signal(
+                    market_name,
+                    cooldown_minutes=60
+                ):
+
+                    # TELEGRAM ALERT
+
+                    send_telegram_alert(
+                        message
+                    )
+
+                    print(
+                        "Telegram Alert Sent"
+                    )
+
+                    # =========================
+                    # OPEN PAPER TRADE
+                    # =========================
+
+                    open_trade(
+
+                        market_name,
+
+                        "BUY",
+
+                        buy_analysis[
+                            "market_price"
+                        ],
+
+                        buy_analysis[
+                            "stop_loss"
+                        ],
+
+                        buy_analysis[
+                            "take_profit"
+                        ]
+                    )
+
+                    print(
+                        "Paper Trade Opened"
+                    )
+
+                else:
+
+                    print(
+                        "Cooldown Active"
+                    )
 
             # =========================
             # SELL SIGNAL
@@ -143,19 +199,69 @@ Reason:
 {sell_analysis['reason']}
 """
 
-                send_telegram_alert(
-                    message
-                )
+                # =========================
+                # COOLDOWN FILTER
+                # =========================
+
+                if can_send_signal(
+                    market_name,
+                    cooldown_minutes=60
+                ):
+
+                    # TELEGRAM ALERT
+
+                    send_telegram_alert(
+                        message
+                    )
+
+                    print(
+                        "Telegram Alert Sent"
+                    )
+
+                    # =========================
+                    # OPEN PAPER TRADE
+                    # =========================
+
+                    open_trade(
+
+                        market_name,
+
+                        "SELL",
+
+                        sell_analysis[
+                            "market_price"
+                        ],
+
+                        sell_analysis[
+                            "stop_loss"
+                        ],
+
+                        sell_analysis[
+                            "take_profit"
+                        ]
+                    )
+
+                    print(
+                        "Paper Trade Opened"
+                    )
+
+                else:
+
+                    print(
+                        "Cooldown Active"
+                    )
 
             else:
 
-                print("NO VALID TRADE")
+                print(
+                    "NO VALID TRADE"
+                )
 
             # =========================
             # SMALL DELAY
             # =========================
 
-            time.sleep(5)
+            time.sleep(2)
 
     except Exception as e:
 
@@ -166,6 +272,8 @@ Reason:
     # WAIT BEFORE NEXT SCAN
     # =========================
 
-    print("\nWAITING 60 SECONDS...\n")
+    print(
+        "\nWAITING 5 MINUTES...\n"
+    )
 
-    time.sleep(60)
+    time.sleep(300)

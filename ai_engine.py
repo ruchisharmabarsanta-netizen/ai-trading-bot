@@ -14,10 +14,27 @@ def analyze_trade(
     price
 ):
 
-    symbol = "GC=F"
+    # =========================
+    # SYMBOL MAP
+    # =========================
+
+    symbol_map = {
+
+        "GOLD": "GC=F",
+
+        "BTCUSD": "BTC-USD",
+
+        "ETHUSD": "ETH-USD",
+
+        "NIFTY": "^NSEI",
+
+        "BANKNIFTY": "^NSEBANK"
+    }
+
+    symbol = symbol_map[ticker]
 
     # =========================
-    # LOWER TIMEFRAME DATA
+    # DOWNLOAD DATA
     # =========================
 
     df = yf.download(
@@ -27,10 +44,6 @@ def analyze_trade(
         progress=False
     )
 
-    # =========================
-    # HIGHER TIMEFRAME DATA
-    # =========================
-
     higher_df = yf.download(
         symbol,
         period="10d",
@@ -39,15 +52,11 @@ def analyze_trade(
     )
 
     # =========================
-    # FIX DATAFRAMES
+    # FIX DATA
     # =========================
 
     close_prices = (
         df["Close"].squeeze()
-    )
-
-    higher_close = (
-        higher_df["Close"].squeeze()
     )
 
     high_prices = (
@@ -58,8 +67,12 @@ def analyze_trade(
         df["Low"].squeeze()
     )
 
-    open_prices = (
-        df["Open"].squeeze()
+    volume = (
+        df["Volume"].squeeze()
+    )
+
+    higher_close = (
+        higher_df["Close"].squeeze()
     )
 
     # =========================
@@ -76,7 +89,7 @@ def analyze_trade(
     )
 
     # =========================
-    # EMA 200
+    # EMA
     # =========================
 
     ema_indicator = EMAIndicator(
@@ -130,6 +143,22 @@ def analyze_trade(
 
     df["ATR"] = (
         atr_indicator.average_true_range()
+    )
+
+    # =========================
+    # VOLUME
+    # =========================
+
+    avg_volume = (
+        volume.tail(20).mean()
+    )
+
+    latest_volume = (
+        volume.iloc[-1]
+    )
+
+    high_volume = (
+        latest_volume > avg_volume
     )
 
     # =========================
@@ -199,11 +228,11 @@ def analyze_trade(
     )
 
     # =========================
-    # CANDLESTICK PATTERNS
+    # CANDLESTICK
     # =========================
 
     prev_open = float(
-        open_prices.iloc[-2]
+        df["Open"].squeeze().iloc[-2]
     )
 
     prev_close = float(
@@ -211,16 +240,12 @@ def analyze_trade(
     )
 
     current_open = float(
-        open_prices.iloc[-1]
+        df["Open"].squeeze().iloc[-1]
     )
 
     current_close = float(
         close_prices.iloc[-1]
     )
-
-    # =========================
-    # BULLISH ENGULFING
-    # =========================
 
     bullish_engulfing = (
 
@@ -232,10 +257,6 @@ def analyze_trade(
 
         and current_open < prev_close
     )
-
-    # =========================
-    # BEARISH ENGULFING
-    # =========================
 
     bearish_engulfing = (
 
@@ -249,7 +270,7 @@ def analyze_trade(
     )
 
     # =========================
-    # ANALYSIS OBJECT
+    # ANALYSIS
     # =========================
 
     analysis = {
@@ -260,29 +281,7 @@ def analyze_trade(
 
         "rsi": latest_rsi,
 
-        "ema200": latest_ema,
-
-        "macd": latest_macd,
-
-        "macd_signal": latest_macd_signal,
-
-        "atr": latest_atr,
-
         "market_price": current_price,
-
-        "support": round(
-            recent_low,
-            2
-        ),
-
-        "resistance": round(
-            recent_high,
-            2
-        ),
-
-        "bullish_engulfing": bullish_engulfing,
-
-        "bearish_engulfing": bearish_engulfing,
 
         "stop_loss": 0,
 
@@ -292,14 +291,14 @@ def analyze_trade(
     }
 
     # =========================
-    # BUY LOGIC
+    # BUY
     # =========================
 
     if signal == "BUY":
 
         if (
 
-            latest_rsi > 45
+            latest_rsi > 55
 
             and current_price > latest_ema
 
@@ -310,46 +309,46 @@ def analyze_trade(
             and higher_price > higher_ema
 
             and current_price > (
-                recent_high - 15
+                recent_high - 5
             )
 
             and bullish_engulfing
 
+            and high_volume
         ):
 
             analysis["approved"] = True
 
-            analysis["confidence"] = 0.93
+            analysis["confidence"] = 0.95
 
             analysis["stop_loss"] = round(
                 current_price
-                - (latest_atr * 1.5),
+                - (latest_atr * 1.2),
                 2
             )
 
             analysis["take_profit"] = round(
                 current_price
-                + (latest_atr * 3),
+                + (latest_atr * 4),
                 2
             )
 
             analysis["reason"] = (
                 "Bullish engulfing + "
                 "breakout + "
-                "trend confirmation + "
-                "RSI strength + "
-                "MACD bullish"
+                "volume confirmation + "
+                "trend confirmation"
             )
 
     # =========================
-    # SELL LOGIC
+    # SELL
     # =========================
 
     elif signal == "SELL":
 
         if (
 
-            latest_rsi < 55
+            latest_rsi < 45
 
             and current_price < latest_ema
 
@@ -360,35 +359,35 @@ def analyze_trade(
             and higher_price < higher_ema
 
             and current_price < (
-                recent_low + 15
+                recent_low + 5
             )
 
             and bearish_engulfing
 
+            and high_volume
         ):
 
             analysis["approved"] = True
 
-            analysis["confidence"] = 0.93
+            analysis["confidence"] = 0.95
 
             analysis["stop_loss"] = round(
                 current_price
-                + (latest_atr * 1.5),
+                + (latest_atr * 1.2),
                 2
             )
 
             analysis["take_profit"] = round(
                 current_price
-                - (latest_atr * 3),
+                - (latest_atr * 4),
                 2
             )
 
             analysis["reason"] = (
                 "Bearish engulfing + "
                 "breakdown + "
-                "trend confirmation + "
-                "RSI weakness + "
-                "MACD bearish"
+                "volume confirmation + "
+                "trend confirmation"
             )
 
     return analysis

@@ -1,31 +1,31 @@
-from datetime import (
-    datetime,
-    timedelta
-)
+last_signal_time = {}
 
-last_trade_time = None
+def can_send_signal(
+    market,
+    cooldown_minutes=60
+):
 
+    import time
 
-def can_trade():
+    current_time = time.time()
 
-    global last_trade_time
+    if market not in last_signal_time:
 
-    if last_trade_time is None:
+        last_signal_time[market] = current_time
 
         return True
 
-    cooldown = timedelta(
-        minutes=15
+    elapsed = (
+        current_time
+        - last_signal_time[market]
     )
 
-    return (
-        datetime.now()
-        - last_trade_time
-    ) > cooldown
+    if elapsed > (
+        cooldown_minutes * 60
+    ):
 
+        last_signal_time[market] = current_time
 
-def update_trade_time():
+        return True
 
-    global last_trade_time
-
-    last_trade_time = datetime.now()
+    return False
